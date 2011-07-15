@@ -50,16 +50,17 @@ class Generator
         if (is_array($className)) {
             foreach ($className as $interface) {
                 $class = new \ReflectionClass($interface);
-                $classData[] = self::_analyseClass($class, $interface, $allowFinal);
+                $classData[] = self::_analyseClass($class, $interface, $allowFinal || !empty($partialMethods), $partialMethods);
             }
         } else {
             $class = new \ReflectionClass($className);
-            $classData[] = self::_analyseClass($class, $className, $allowFinal);
+            $classData[] = self::_analyseClass($class, $className, $allowFinal || !empty($partialMethods), $partialMethods);
         }
         foreach ($classData as $data) {
             if ($data['class']->isInterface()) {
                 $interfaceInheritance[] = $data['className'];
-            } elseif ($data['class']->isFinal() || $data['hasFinalMethods']) {
+            } elseif ($data['class']->isFinal() || ($data['hasFinalMethods'] && $allowFinal)) {
+                $data['className'] = '\\Mockery\\Mock';
                 $inheritance = ' extends ' . $data['className'];
                 $classNameInherited = $data['className'];
                 $classIsFinal = true;
@@ -76,7 +77,7 @@ class Generator
         
         $definition .= 'class ' . $mockName . $inheritance . PHP_EOL . '{' . PHP_EOL;
         foreach ($classData as $data) {
-            if (!$data['class']->isFinal() && !$data['hasFinalMethods']) {
+            if (!$data['class']->isFinal() && !$classIsFinal) {
                 $result = self::applyMockeryTo($data['class'], $data['publicMethods'], $block, $partialMethods);
                 if ($result['callTypehinting']) $callTypehinting = true;
                 $definition .= $result['definition'];
@@ -91,7 +92,7 @@ class Generator
         return $mockName;
     }
     
-    protected static function _analyseClass($class, $className, $allowFinal = false)
+    protected static function _analyseClass($class, $className, $allowFinal = false, $partialMethods = array())
     {
         if ($class->isFinal() && !$allowFinal) {
             throw new \Mockery\Exception(
@@ -108,7 +109,7 @@ class Generator
         $methods = $class->getMethods(\ReflectionMethod::IS_PUBLIC);
         $protected = $class->getMethods(\ReflectionMethod::IS_PROTECTED);
         foreach ($methods as $method) {
-            if ($method->isFinal()  && !$allowFinal) {
+            if ($method->isFinal()  && (!$allowFinal || in_array($method->getName(), $partialMethods))) {
                 throw new \Mockery\Exception(
                     'The method ' . $method->getName()
                     . ' is marked final and it is not possible to generate a '
@@ -117,7 +118,6 @@ class Generator
                     . 'partial mock.'
                 );
             } elseif ($method->isFinal()) {
-                $className = '\\Mockery\\Mock';
                 $hasFinalMethods = true;
             }
         }

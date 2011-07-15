@@ -585,7 +585,38 @@ class ContainerTest extends PHPUnit_Framework_TestCase
         $this->container->mockery_verify();
         \Mockery::resetContainer();
     }
+	 
+	 /**
+     * @expectedException \Mockery\Exception
+     * @group finalclass
+     * @group partial
+     */
+    public function testThrowsExceptionIfFinalMethodIsListedInPartialMethods()
+    {
+        $m = $this->container->mock('MockeryTest_PartialClassWithFinalAndNormalMethod[foo]');
+    }
     
+	 /**
+     * @group finalclass
+     * @group partial
+     */
+    public function testPartialMockClassWithFinalAndNormalMethod()
+    {
+		  \Mockery::setContainer($this->container);
+		  $m = $this->container->mock('MockeryTest_PartialClassWithFinalAndNormalMethod[bar]');
+		  $m->shouldReceive('bar')->once()->andReturn('bar_result');
+		  $this->assertInstanceOf('MockeryTest_PartialClassWithFinalAndNormalMethod', $m);
+		  $this->assertSame('foo_result', $m->foo());
+		  $this->assertSame('bar_result', $m->bar());
+        $this->container->mockery_verify();
+        \Mockery::resetContainer();
+    }
+    
+}
+
+class MockeryTest_PartialClassWithFinalAndNormalMethod {
+    final public function foo() {return 'foo_result';}
+    public function bar() {return '';}
 }
 
 class MockeryTest_IssetMethod
